@@ -536,6 +536,30 @@ def run_sni_prefix_sensitivity(company: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def get_swedish_branch_name(interval: str) -> str:
+    try:
+        start = int(str(interval).split('-')[0])
+        if 1 <= start <= 3: return "Jordbruk & Fiske"
+        elif 5 <= start <= 9: return "Mineralutvinning"
+        elif 10 <= start <= 33: return "Tillverkning"
+        elif 35 <= start <= 39: return "Energi & Miljö"
+        elif 41 <= start <= 43: return "Byggverksamhet"
+        elif 45 <= start <= 47: return "Handel"
+        elif 49 <= start <= 53: return "Transport & Magasinering"
+        elif 55 <= start <= 56: return "Hotell & Restaurang"
+        elif 58 <= start <= 60: return "Media & Publicering"
+        elif 61 <= start <= 63: return "IT & Kommunikation"
+        elif 64 <= start <= 66: return "Finans & Försäkring"
+        elif start == 68: return "Fastighetsverksamhet"
+        elif 69 <= start <= 75: return "Företagstjänster"
+        elif 77 <= start <= 82: return "Uthyrning & Service"
+        elif 86 <= start <= 88: return "Vård & Omsorg"
+        elif 90 <= start <= 93: return "Kultur & Nöje"
+        else: return "Övriga tjänster"
+    except:
+        return "Okänd"
+
+
 def create_plots(
     summary: pd.DataFrame, company: pd.DataFrame
 ) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
@@ -552,12 +576,21 @@ def create_plots(
     fig5_path = OUTPUT_DIR / "plot_sni2_group_sizes.png"
     fig6_path = OUTPUT_DIR / "plot_efficiency_gap_boxplot.png"
     fig7_path = OUTPUT_DIR / "plot_cagr_distributions_hist.png"
+    
+    # --- NYA FILVÄGAR FÖR DE TRE NYA PLOTTARNA ---
+    fig8_path = OUTPUT_DIR / "plot_sni2_dumbbell_scalability.png"
+    fig9_path = OUTPUT_DIR / "plot_sni2_quadrant_scatter.png"
+    fig10_path = OUTPUT_DIR / "plot_sni2_scalability_ranking.png"
 
+    # ==========================================
+    # BEFINTLIGA PLOTTAR (1-7) - HELT ORÖRDA
+    # ==========================================
+    
     plot_df = summary.sort_values("efficiency_gap_mean_pct", ascending=False).head(15)
     x = np.arange(len(plot_df))
     labels = [
-        f"{interval} {str(desc)[:28]}{'...' if len(str(desc)) > 28 else ''}"
-        for interval, desc in zip(plot_df["division_interval"], plot_df["section_desc"])
+        f"{str(interval)} : {get_swedish_branch_name(str(interval))}"
+        for interval in plot_df["division_interval"]
     ]
 
     fig1, ax1 = plt.subplots(figsize=(13, 6))
@@ -580,10 +613,10 @@ def create_plots(
             ci_df["efficiency_gap_ci_high"] - ci_df["efficiency_gap_mean_pct"],
         ]
     )
-    fig2, ax2 = plt.subplots(figsize=(11, 7))
+    fig2, ax2 = plt.subplots(figsize=(12, 7))
     y_labels = [
-        f"{interval} {str(desc)[:35]}{'...' if len(str(desc)) > 35 else ''}"
-        for interval, desc in zip(ci_df["division_interval"], ci_df["section_desc"])
+        f"{str(interval)} : {get_swedish_branch_name(str(interval))}"
+        for interval in ci_df["division_interval"]
     ]
     ax2.errorbar(
         ci_df["efficiency_gap_mean_pct"],
@@ -600,20 +633,30 @@ def create_plots(
     fig2.tight_layout()
     fig2.savefig(fig2_path, dpi=220)
 
-    # Company-level scatter: turnover CAGR vs employee CAGR.
     scatter_df = company.dropna(
         subset=["turnover_cagr_pct", "employees_cagr_pct", "division_interval"]
     ).copy()
     scatter_df["size"] = np.log1p(pd.to_numeric(scatter_df["turnover_2024"], errors="coerce"))
-    fig3, ax3 = plt.subplots(figsize=(10, 7))
-    sc = ax3.scatter(
-        scatter_df["employees_cagr_pct"],
-        scatter_df["turnover_cagr_pct"],
-        c=scatter_df["sni_2digit"],
-        s=20 + 18 * scatter_df["size"].fillna(0),
-        alpha=0.55,
-        cmap="viridis",
+    scatter_df["bransch_etikett"] = scatter_df["division_interval"].apply(
+        lambda x: f"{str(x)} : {get_swedish_branch_name(str(x))}"
     )
+    
+    fig3, ax3 = plt.subplots(figsize=(12, 7))
+    unika_etiketter = scatter_df["bransch_etikett"].unique()
+    cmap = plt.get_cmap("tab20")
+    
+    for i, etikett in enumerate(unika_etiketter):
+        subset = scatter_df[scatter_df["bransch_etikett"] == etikett]
+        s_values = 20 + 18 * subset["size"].fillna(0)
+        ax3.scatter(
+            subset["employees_cagr_pct"],
+            subset["turnover_cagr_pct"],
+            s=s_values,
+            alpha=0.55,
+            color=cmap(i % 20),
+            label=etikett
+        )
+
     min_axis = min(
         np.nanmin(scatter_df["employees_cagr_pct"]),
         np.nanmin(scatter_df["turnover_cagr_pct"]),
@@ -622,17 +665,19 @@ def create_plots(
         np.nanmax(scatter_df["employees_cagr_pct"]),
         np.nanmax(scatter_df["turnover_cagr_pct"]),
     )
-    ax3.plot([min_axis, max_axis], [min_axis, max_axis], linestyle="--", linewidth=1)
+    ax3.plot([min_axis, max_axis], [min_axis, max_axis], linestyle="--", linewidth=1, color="black", alpha=0.5)
     ax3.set_xlabel("Employee CAGR (%)")
     ax3.set_ylabel("Turnover CAGR (%)")
     ax3.set_title("Bolagsnivå: Omsättningstillväxt vs anställdstillväxt")
     ax3.grid(alpha=0.3, linestyle="--")
-    cbar = fig3.colorbar(sc, ax=ax3)
-    cbar.set_label("SNI 2-siffrig kod")
+    
+    leg = ax3.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title="Bransch")
+    for handle in leg.legend_handles:
+        handle.set_sizes([50.0])
+        
     fig3.tight_layout()
-    fig3.savefig(fig3_path, dpi=220)
+    fig3.savefig(fig3_path, dpi=220, bbox_inches='tight')
 
-    # Heatmap for interval-level means.
     heat_df = (
         summary[
             [
@@ -646,31 +691,33 @@ def create_plots(
         .sort_values("efficiency_gap_mean_pct", ascending=False)
     )
     heat_values = heat_df.to_numpy(dtype=float)
-    fig4, ax4 = plt.subplots(figsize=(9, 7))
+    fig4, ax4 = plt.subplots(figsize=(12, 7))
     im = ax4.imshow(heat_values, aspect="auto", cmap="RdYlGn")
     ax4.set_xticks(np.arange(heat_df.shape[1]))
     ax4.set_xticklabels(
         ["Turnover CAGR", "Employees CAGR", "Efficiency gap"], rotation=20, ha="right"
     )
     ax4.set_yticks(np.arange(heat_df.shape[0]))
-    ax4.set_yticklabels(heat_df.index.tolist())
+    heat_labels = [f"{str(idx)} : {get_swedish_branch_name(str(idx))}" for idx in heat_df.index]
+    ax4.set_yticklabels(heat_labels)
     ax4.set_title("SNI-intervall: jämförelse av tillväxtmått")
     fig4.colorbar(im, ax=ax4, label="Procent")
     fig4.tight_layout()
     fig4.savefig(fig4_path, dpi=220)
 
-    # Descriptive plot: group sizes per interval.
     size_df = summary.sort_values("n_companies", ascending=False)
-    fig5, ax5 = plt.subplots(figsize=(10, 6))
-    ax5.bar(size_df["division_interval"], size_df["n_companies"], color="tab:blue", alpha=0.8)
+    fig5, ax5 = plt.subplots(figsize=(12, 7))
+    x_labels = [f"{str(val)} : {get_swedish_branch_name(str(val))}" for val in size_df["division_interval"]]
+    ax5.bar(x_labels, size_df["n_companies"], color="tab:blue", alpha=0.8)
     ax5.set_title("Antal bolag per SNI-intervall i analysurvalet")
     ax5.set_xlabel("SNI-intervall")
     ax5.set_ylabel("Antal bolag")
+    ax5.set_xticks(range(len(x_labels)))
+    ax5.set_xticklabels(x_labels, rotation=45, ha="right")
     ax5.grid(axis="y", linestyle="--", alpha=0.35)
     fig5.tight_layout()
     fig5.savefig(fig5_path, dpi=220)
 
-    # Descriptive plot: boxplot for efficiency-gap dispersion.
     interval_order = (
         summary.sort_values("efficiency_gap_mean_pct", ascending=False)["division_interval"]
         .tolist()
@@ -681,18 +728,20 @@ def create_plots(
         .to_numpy()
         for interval in interval_order
     ]
+    box_labels = [f"{str(interval)} : {get_swedish_branch_name(str(interval))}" for interval in interval_order]
     fig6, ax6 = plt.subplots(figsize=(12, 7))
-    ax6.boxplot(box_data, labels=interval_order, showfliers=True)
+    ax6.boxplot(box_data, tick_labels=box_labels, showfliers=True)
     ax6.axhline(0, color="black", linewidth=1)
     ax6.set_title("Fördelning av efficiency growth gap per SNI-intervall")
     ax6.set_xlabel("SNI-intervall")
     ax6.set_ylabel("Efficiency gap (%)")
     ax6.tick_params(axis="x", rotation=45)
+    for tick in ax6.get_xticklabels():
+        tick.set_ha("right")
     ax6.grid(axis="y", linestyle="--", alpha=0.35)
     fig6.tight_layout()
     fig6.savefig(fig6_path, dpi=220)
 
-    # Descriptive plot: overall distributions of CAGR metrics.
     fig7, axes7 = plt.subplots(1, 3, figsize=(15, 4.8))
     axes7[0].hist(company["turnover_cagr_pct"].dropna(), bins=30, color="tab:blue", alpha=0.75)
     axes7[0].set_title("Omsättning CAGR")
@@ -711,17 +760,123 @@ def create_plots(
     fig7.tight_layout()
     fig7.savefig(fig7_path, dpi=220)
 
+
+    # ==========================================
+    # DE 3 NYA "HJÄLTE"-PLOTTARNA FÖR RAPPORTEN
+    # ==========================================
+
+    # FIGUR 8: HANTELDIAGRAMMET (The Dumbbell Plot)
+    db_df = summary.sort_values("efficiency_gap_mean_pct", ascending=True)
+    db_labels = [f"{str(i)} : {get_swedish_branch_name(str(i))}" for i in db_df["division_interval"]]
+    
+    fig8, ax8 = plt.subplots(figsize=(10, 8))
+    for i, (_, row) in enumerate(db_df.iterrows()):
+        t_cagr = row["turnover_cagr_mean_pct"]
+        e_cagr = row["employees_cagr_mean_pct"]
+        # Rita strecket mellan punkterna (skalbarhetsgapet)
+        ax8.plot([e_cagr, t_cagr], [i, i], color="grey", zorder=1, linewidth=2, alpha=0.5)
+        # Rita anställda-pricken
+        ax8.scatter(e_cagr, i, color="tab:blue", s=100, zorder=2)
+        # Rita omsättnings-pricken
+        ax8.scatter(t_cagr, i, color="tab:green", s=100, zorder=2)
+    
+    ax8.set_yticks(range(len(db_df)))
+    ax8.set_yticklabels(db_labels)
+    ax8.set_xlabel("Genomsnittlig CAGR (%)")
+    ax8.set_title("Branschernas skalbarhets-gap: Omsättning vs Anställda")
+    ax8.grid(axis="x", linestyle="--", alpha=0.4)
+    # Skapa manuell legend
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='tab:blue', markersize=10, label='Anställda CAGR'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='tab:green', markersize=10, label='Omsättning CAGR')
+    ]
+    ax8.legend(handles=legend_elements, loc='lower right')
+    fig8.tight_layout()
+    fig8.savefig(fig8_path, dpi=220)
+
+
+    # FIGUR 9: KVADRANTDIAGRAM (Industry Quadrant Scatter)
+    fig9, ax9 = plt.subplots(figsize=(12, 8))
+    quad_cmap = plt.get_cmap("tab20")
+    
+    # Beräkna medelvärden för att dra kvadranter
+    mean_e_cagr = summary["employees_cagr_mean_pct"].mean()
+    mean_t_cagr = summary["turnover_cagr_mean_pct"].mean()
+
+    for i, (_, row) in enumerate(summary.iterrows()):
+        etikett = f"{str(row['division_interval'])} : {get_swedish_branch_name(str(row['division_interval']))}"
+        # Storleken baseras på antal bolag
+        s_val = 50 + (row["n_companies"] * 10) 
+        ax9.scatter(
+            row["employees_cagr_mean_pct"],
+            row["turnover_cagr_mean_pct"],
+            s=s_val,
+            alpha=0.7,
+            color=quad_cmap(i % 20),
+            edgecolor="black",
+            label=etikett
+        )
+
+    # Rita linjer för kvadranterna
+    ax9.axvline(mean_e_cagr, color="black", linestyle="--", alpha=0.5)
+    ax9.axhline(mean_t_cagr, color="black", linestyle="--", alpha=0.5)
+    
+    # Skriv ut text för "Vinnar-kvadranten"
+    ax9.text(
+        mean_e_cagr * 0.5, 
+        ax9.get_ylim()[1] * 0.9, 
+        "HÖG SKALBARHET\n(Stark omsättning, lågt personalbehov)", 
+        ha="center", va="top", fontsize=10, alpha=0.7, bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')
+    )
+
+    ax9.set_xlabel("Genomsnittlig Anställda CAGR (%)")
+    ax9.set_ylabel("Genomsnittlig Omsättning CAGR (%)")
+    ax9.set_title("Branschkvadranter: Var växer företagen bäst?")
+    ax9.grid(alpha=0.2, linestyle="-")
+    
+    leg9 = ax9.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title="Bransch (Storlek = Antal bolag)")
+    for handle in leg9.legend_handles:
+        handle.set_sizes([50.0])
+        
+    fig9.tight_layout()
+    fig9.savefig(fig9_path, dpi=220, bbox_inches='tight')
+
+
+    # FIGUR 10: SKALBARHETS-TOPPLISTAN (Stapeldiagram på gapet)
+    rank_df = summary.sort_values("efficiency_gap_mean_pct", ascending=True)
+    rank_labels = [f"{str(i)} : {get_swedish_branch_name(str(i))}" for i in rank_df["division_interval"]]
+    
+    fig10, ax10 = plt.subplots(figsize=(10, 8))
+    # Färgkodning: Grön om gapet är över 0, röd om det är under
+    colors = ["tab:green" if gap >= 0 else "tab:red" for gap in rank_df["efficiency_gap_mean_pct"]]
+    
+    bars = ax10.barh(rank_labels, rank_df["efficiency_gap_mean_pct"], color=colors, alpha=0.8)
+    
+    ax10.axvline(0, color="black", linewidth=1.5)
+    ax10.set_xlabel("Efficiency Gap (%) (Omsättning CAGR - Anställda CAGR)")
+    ax10.set_title("Rankning: Vilka branscher har högst skalbarhet?")
+    ax10.grid(axis="x", linestyle="--", alpha=0.4)
+    
+    # Lägg till procentsiffran i änden av varje stapel för extra tydlighet
+    for bar in bars:
+        width = bar.get_width()
+        label_x_pos = width + 2 if width > 0 else width - 2
+        ha = 'left' if width > 0 else 'right'
+        ax10.text(label_x_pos, bar.get_y() + bar.get_height()/2, f'{width:.0f}%', 
+                  ha=ha, va='center', fontsize=9)
+
+    fig10.tight_layout()
+    fig10.savefig(fig10_path, dpi=220)
+
+
     if os.getenv("KV_NO_SHOW", "0") != "1":
         plt.show()
 
-    plt.close(fig1)
-    plt.close(fig2)
-    plt.close(fig3)
-    plt.close(fig4)
-    plt.close(fig5)
-    plt.close(fig6)
-    plt.close(fig7)
-    return fig1_path, fig2_path, fig3_path, fig4_path, fig5_path, fig6_path, fig7_path
+    plt.close('all') # Stänger alla figurer rent och snyggt
+    
+    # Du måste numera returnera alla 10 filvägar
+    return fig1_path, fig2_path, fig3_path, fig4_path, fig5_path, fig6_path, fig7_path, fig8_path, fig9_path, fig10_path
 
 
 def run() -> None:
@@ -752,7 +907,9 @@ def run() -> None:
     regression = run_multiple_regression(company)
     trends = run_time_series_trends(company)
     prefix_sensitivity = run_sni_prefix_sensitivity(company)
-    fig1, fig2, fig3, fig4, fig5, fig6, fig7 = create_plots(summary, company)
+    
+    # Uppdaterad rad för att ta emot 10 figurer
+    f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 = create_plots(summary, company)
 
     company_path = OUTPUT_DIR / "sni2_company_growth_base.csv"
     summary_path = OUTPUT_DIR / "sni2_scalability_summary.csv"
@@ -857,6 +1014,9 @@ def run() -> None:
     print("- plot_sni2_group_sizes: visar hur mycket data som ligger bakom varje SNI-intervall.")
     print("- plot_efficiency_gap_boxplot: visar median, spridning och outliers per intervall.")
     print("- plot_cagr_distributions_hist: visar totalfordelning av CAGR och efficiency gap i samplet.")
+    print("- plot_sni2_dumbbell_scalability (NY): Visar direkt gapet mellan omsättning och personal för varje bransch.")
+    print("- plot_sni2_quadrant_scatter (NY): Branscher i övre vänstra hörnet är de riktiga vinnarna.")
+    print("- plot_sni2_scalability_ranking (NY): Enkel topplista sorterad på skalbarhet.")
 
     print("\nFiler sparade:")
     print(f"- {company_path.resolve()}")
@@ -866,13 +1026,16 @@ def run() -> None:
     print(f"- {regression_path.resolve()}")
     print(f"- {trends_path.resolve()}")
     print(f"- {prefix_sensitivity_path.resolve()}")
-    print(f"- {fig1.resolve()}")
-    print(f"- {fig2.resolve()}")
-    print(f"- {fig3.resolve()}")
-    print(f"- {fig4.resolve()}")
-    print(f"- {fig5.resolve()}")
-    print(f"- {fig6.resolve()}")
-    print(f"- {fig7.resolve()}")
+    print(f"- {f1.resolve()}")
+    print(f"- {f2.resolve()}")
+    print(f"- {f3.resolve()}")
+    print(f"- {f4.resolve()}")
+    print(f"- {f5.resolve()}")
+    print(f"- {f6.resolve()}")
+    print(f"- {f7.resolve()}")
+    print(f"- {f8.resolve()}")
+    print(f"- {f9.resolve()}")
+    print(f"- {f10.resolve()}")
 
 
 if __name__ == "__main__":
