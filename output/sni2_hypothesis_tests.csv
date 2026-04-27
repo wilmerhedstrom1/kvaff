@@ -1,0 +1,6 @@
+test,n_group_1,n_group_2,statistic,p_value
+Paired t-test: turnover CAGR vs employee CAGR,383,383.0,12.03827609852634,1.6175351137100828e-28
+One-way ANOVA across SNI sections (official categories),17,,0.6410555807345824,0.8500387026251887
+One-way ANOVA across SNI groups (n>=5),18,,2.288031731765456,0.002893163055344215
+One-way ANOVA on CAGR per employee across intervals (n>=5),13,,0.9540676652769419,0.49280794317497945
+One-way ANOVA on turnover per employee (2024) across intervals (n>=5),13,,2.3342213627128268,0.006901038650728129

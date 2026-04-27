@@ -1,0 +1,47 @@
+file,sheet,column_idx,column_name
+Projekt2data.xlsx,Company Overview,0,In Database
+Projekt2data.xlsx,Company Overview,1,Org Number
+Projekt2data.xlsx,Company Overview,2,Legal Name
+Projekt2data.xlsx,Company Overview,3,Classification
+Projekt2data.xlsx,Company Overview,4,Legal Form
+Projekt2data.xlsx,Company Overview,5,Active/Inactive
+Projekt2data.xlsx,Company Overview,6,Founded Year
+Projekt2data.xlsx,Company Overview,7,Region
+Projekt2data.xlsx,Company Overview,8,Municipality
+Projekt2data.xlsx,Company Overview,9,Postal Code
+Projekt2data.xlsx,Company Overview,10,SNI Code
+Projekt2data.xlsx,Company Overview,11,Description of Business
+Projekt2data.xlsx,Company Overview,12,Industry Categories
+Projekt2data.xlsx,Company Overview,13,Reporting Year
+Projekt2data.xlsx,Company Overview,14,Turnover
+Projekt2data.xlsx,Company Overview,15,Personnel Costs
+Projekt2data.xlsx,Company Overview,16,Total Employees
+Projekt2data.xlsx,Company Overview,17,Board Total
+Projekt2data.xlsx,Company Overview,18,Board Women
+Projekt2data.xlsx,Company Overview,19,Board Men
+Projekt2data.xlsx,Company Overview,20,Total Funding
+Projekt2data.xlsx,Turnover,0,Org Number
+Projekt2data.xlsx,Turnover,1,2016
+Projekt2data.xlsx,Turnover,2,2017
+Projekt2data.xlsx,Turnover,3,2018
+Projekt2data.xlsx,Turnover,4,2019
+Projekt2data.xlsx,Turnover,5,2020
+Projekt2data.xlsx,Turnover,6,2021
+Projekt2data.xlsx,Turnover,7,2022
+Projekt2data.xlsx,Turnover,8,2023
+Projekt2data.xlsx,Turnover,9,2024
+Projekt2data.xlsx,Turnover,10,2025
+Projekt2data.xlsx,Employees,0,Org Number
+Projekt2data.xlsx,Employees,1,2016
+Projekt2data.xlsx,Employees,2,2017
+Projekt2data.xlsx,Employees,3,2018
+Projekt2data.xlsx,Employees,4,2019
+Projekt2data.xlsx,Employees,5,2020
+Projekt2data.xlsx,Employees,6,2021
+Projekt2data.xlsx,Employees,7,2022
+Projekt2data.xlsx,Employees,8,2023
+Projekt2data.xlsx,Employees,9,2024
+Projekt2data.xlsx,Employees,10,2025
+sni-2025-eng-251022.xlsx,Section,0,SNI2025Section
+sni-2025-eng-251022.xlsx,Section,1,Description 
+sni-2025-eng-251022.xlsx,Section,2,Division (Twodigit)
