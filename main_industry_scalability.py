@@ -581,6 +581,7 @@ def create_plots(
     fig8_path = OUTPUT_DIR / "plot_sni2_dumbbell_scalability.png"
     fig9_path = OUTPUT_DIR / "plot_sni2_quadrant_scatter.png"
     fig10_path = OUTPUT_DIR / "plot_sni2_scalability_ranking.png"
+    fig11_path = OUTPUT_DIR / "plot_sni2_results_table.png"
 
     # ==========================================
     # BEFINTLIGA PLOTTAR (1-7) - HELT ORÖRDA
@@ -869,14 +870,72 @@ def create_plots(
     fig10.tight_layout()
     fig10.savefig(fig10_path, dpi=220)
 
+    # FIGUR 11: FULL RESULTATTABELL (för screenshot i separat plot-flik)
+    table_df = summary.sort_values("efficiency_gap_mean_pct", ascending=False).copy()
+    table_df["Sektor"] = table_df["division_interval"].map(
+        lambda interval: get_swedish_branch_name(str(interval))
+    )
+    table_df = table_df[
+        [
+            "division_interval",
+            "Sektor",
+            "n_companies",
+            "turnover_cagr_mean_pct",
+            "employees_cagr_mean_pct",
+            "efficiency_gap_mean_pct",
+        ]
+    ].rename(
+        columns={
+            "division_interval": "SNI-intervall",
+            "n_companies": "Antal bolag",
+            "turnover_cagr_mean_pct": "Omsättning CAGR (%)",
+            "employees_cagr_mean_pct": "Anställda CAGR (%)",
+            "efficiency_gap_mean_pct": "Efficiency growth gap (%)",
+        }
+    )
+    for col in [
+        "Omsättning CAGR (%)",
+        "Anställda CAGR (%)",
+        "Efficiency growth gap (%)",
+    ]:
+        table_df[col] = table_df[col].map(lambda value: f"{value:.2f}")
+
+    fig11_height = max(5, 0.55 * (len(table_df) + 2))
+    fig11, ax11 = plt.subplots(figsize=(15, fig11_height))
+    ax11.axis("off")
+    ax11.set_title(
+        "Alla SNI-resultat: omsättning, anställda och efficiency growth gap",
+        fontsize=15,
+        fontweight="bold",
+        pad=18,
+    )
+    table = ax11.table(
+        cellText=table_df.values,
+        colLabels=table_df.columns,
+        loc="center",
+        cellLoc="center",
+        colLoc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9.5)
+    table.scale(1, 1.45)
+    for (row_idx, _col_idx), cell in table.get_celld().items():
+        if row_idx == 0:
+            cell.set_text_props(weight="bold", color="white")
+            cell.set_facecolor("#2F5597")
+        elif row_idx % 2 == 0:
+            cell.set_facecolor("#F2F2F2")
+    fig11.tight_layout()
+    fig11.savefig(fig11_path, dpi=220, bbox_inches="tight")
+
 
     if os.getenv("KV_NO_SHOW", "0") != "1":
         plt.show()
 
     plt.close('all') # Stänger alla figurer rent och snyggt
     
-    # Du måste numera returnera alla 10 filvägar
-    return fig1_path, fig2_path, fig3_path, fig4_path, fig5_path, fig6_path, fig7_path, fig8_path, fig9_path, fig10_path
+    # Du måste numera returnera alla 11 filvägar
+    return fig1_path, fig2_path, fig3_path, fig4_path, fig5_path, fig6_path, fig7_path, fig8_path, fig9_path, fig10_path, fig11_path
 
 
 def run() -> None:
@@ -908,8 +967,8 @@ def run() -> None:
     trends = run_time_series_trends(company)
     prefix_sensitivity = run_sni_prefix_sensitivity(company)
     
-    # Uppdaterad rad för att ta emot 10 figurer
-    f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 = create_plots(summary, company)
+    # Uppdaterad rad för att ta emot 11 figurer
+    f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11 = create_plots(summary, company)
 
     company_path = OUTPUT_DIR / "sni2_company_growth_base.csv"
     summary_path = OUTPUT_DIR / "sni2_scalability_summary.csv"
@@ -962,26 +1021,8 @@ def run() -> None:
     print(f"- Min bolag per grupp i summary/ANOVA: {MIN_COMPANIES_PER_GROUP}")
     print(f"- Antal analyserade SNI-grupper: {len(summary)}")
 
-    print("\nTop 10 SNI-grupper efter efficiency growth gap:")
-    print(
-        summary[
-            [
-                "division_interval",
-                "section_code",
-                "section_desc",
-                "n_companies",
-                "turnover_cagr_mean_pct",
-                "employees_cagr_mean_pct",
-                "efficiency_gap_mean_pct",
-                "efficiency_gap_ci_low",
-                "efficiency_gap_ci_high",
-                "cagr_per_employee_mean",
-                "turnover_per_employee_2024_mean",
-            ]
-        ]
-        .head(10)
-        .to_string(index=False)
-    )
+    print("\nFull resultattabell öppnas som separat plot-flik:")
+    print("- plot_sni2_results_table: visar alla SNI-intervall med sektor, antal bolag, omsättnings-CAGR, anställda-CAGR och efficiency growth gap.")
     if not tests.empty:
         print("\nHypotestester (p-värden):")
         print(tests.to_string(index=False))
@@ -1017,6 +1058,7 @@ def run() -> None:
     print("- plot_sni2_dumbbell_scalability (NY): Visar direkt gapet mellan omsättning och personal för varje bransch.")
     print("- plot_sni2_quadrant_scatter (NY): Branscher i övre vänstra hörnet är de riktiga vinnarna.")
     print("- plot_sni2_scalability_ranking (NY): Enkel topplista sorterad på skalbarhet.")
+    print("- plot_sni2_results_table (NY): Full tabell över alla SNI-resultat, gjord för screenshot.")
 
     print("\nFiler sparade:")
     print(f"- {company_path.resolve()}")
@@ -1036,6 +1078,7 @@ def run() -> None:
     print(f"- {f8.resolve()}")
     print(f"- {f9.resolve()}")
     print(f"- {f10.resolve()}")
+    print(f"- {f11.resolve()}")
 
 
 if __name__ == "__main__":
